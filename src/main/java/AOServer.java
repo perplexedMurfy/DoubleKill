@@ -260,8 +260,9 @@ public class AOServer {
 					}
 
 					//pre emote
+					//TODO: do something with for *-pre and * emote pairs
 					if (preEmote.equals("-")) { //make this the emote clause instead.
-						message.append (" acts out " + emote + "then");
+						message.append (" acts out " + emote + " then");
 					}
 					else if (!preEmote.contains("normal")) {
 						message.append (" acts out " + preEmote + " then");
@@ -277,7 +278,7 @@ public class AOServer {
 					}
 
 					if (msg.trim().length() > 0) { //if message has content.
-						if (realize) { message.append (" relaizes"); }
+						if (realize) { message.append (" realizes"); } //TODO: fix spelling
 						else if (textColor == 4) { message.append (" thinks"); }
 						else { message.append (" says"); }
 						//TODO: add clause for not saying anything.
