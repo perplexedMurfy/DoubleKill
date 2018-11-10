@@ -1,3 +1,5 @@
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -32,12 +34,22 @@ public class Prog {
 		return result;
 	}
 
+	static String getCreds() throws IOException {
+		FileInputStream fin = new FileInputStream("creds.txt");
+		byte[] buffer = new byte[1000];
+		int count = fin.available();
+		fin.read (buffer, 0, count);
+		buffer[count-1] = 0;
+		buffer[count-2] = 0;
+		return new String (buffer).trim();
+	}
+
 	static public AOServer server = null;
 
-	static public void main (String[] args) throws IOException {
+	static public void main (String[] args) throws IOException, FileNotFoundException {
 		server = new AOServer ();
 		server.setConnection ("104.131.93.82", 27017);
-		Discord.initDiscord ("null");
+		Discord.initDiscord (getCreds());
 
 		Date next = new Date (new Date().getTime() + 45000);
 		while (true) {
