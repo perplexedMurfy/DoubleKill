@@ -48,17 +48,15 @@ public class AOServer {
 	/** Reads packets from the socket into the packetQueue
 	 */
 	void readPackets () throws IOException {
-		try {
-			byte[] buffer = new byte[is.available()];
-			if (is.available() >= 2) {
-				is.read (buffer);
-				
-				String[] packet = new String(buffer).split ("\\#\\%");
-				//TODO: Remove empty bit left over...
-				for (int i = 0; i < packet.length; i++) {
-					if (!((packet[i].length() == 0) || (packet[i].charAt(0) == '\u0000'))) {
-						packetQueue.add (new AOPacket(packet[i] + "#%", false)); //reappends the ending.
-					}
+		byte[] buffer = new byte[is.available()];
+		if (is.available() >= 2) {
+			is.read(buffer);
+			
+			String[] packet = new String(buffer).split("\\#\\%");
+			//TODO: Remove empty bit left over...
+			for (int i = 0; i < packet.length; i++) {
+				if (!((packet[i].length() == 0) || (packet[i].charAt(0) == '\u0000'))) {
+					packetQueue.add(new AOPacket(packet[i] + "#%", false)); //reappends the ending.
 				}
 			}
 		}
