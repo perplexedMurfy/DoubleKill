@@ -1,14 +1,18 @@
 # DoubleKill
 ### A roleplay archiving bot for AO2
 
-This is a bot which pretty prints conversations from a AO2 courtroom out to a Discord channel.
+This is a bot which pretty prints conversations from a AO2 courtroom
+out to a Discord channel.
 
 -------
 
 ## Use
 
-To use DoubleKill, there must be a text file named `creds.txt` with your discord bot token stored inside.
-Once the bot has started up use the following commands.
+To use DoubleKill, there must be a text file named `config.txt` with
+your discord bot token stored on the first line, and the desired
+command prefix on the second line. The default prefix is `;` and will
+be used for the command list below. Once the bot has started up use
+the following commands.
 
 | Command          | Description
 |------------------|------------------------------------------------------|
@@ -21,5 +25,7 @@ Once the bot has started up use the following commands.
 
 ## Compilation
 
-I think IDEA takes care of the heavy work for you. Just load the project file! Build the jar from the artifacts menu.
-if you're developing with this, create an `env/` folder at project root. this is where the program will seek external files while debugging.
+I think IDEA takes care of the heavy work for you. Just load the
+project file! Build the jar from the artifacts menu.  if you're
+developing with this, create an `env/` folder at project root. this is
+where the program will seek external files while debugging.

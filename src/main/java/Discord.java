@@ -16,7 +16,8 @@ public class Discord {
 	static public JDA jda = null;
 	static public TextChannel boundChannel = null;
 
-	static public void initDiscord (String botToken) {
+	static public void initDiscord (Map<String, String> config) {
+		String botToken = config.get ("creds");
 		try {
 			jda = new JDABuilder(AccountType.BOT)
 					.setToken(botToken)

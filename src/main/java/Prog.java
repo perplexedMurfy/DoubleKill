@@ -34,22 +34,25 @@ public class Prog {
 		return result;
 	}
 
-	static String getCreds() throws IOException {
-		FileInputStream fin = new FileInputStream("creds.txt");
-		byte[] buffer = new byte[1000];
-		int count = fin.available();
-		fin.read (buffer, 0, count);
-		buffer[count-1] = 0;
-		buffer[count-2] = 0;
-		return new String (buffer).trim();
+	static Map<String, String> getConfig() throws IOException {
+		FileInputStream fin = new FileInputStream("config.txt");
+		byte[] buffer = new byte[fin.available()];
+		fin.read (buffer);
+
+		String[] file = new String (buffer).split("\\n", 2);
+
+		new Map<String, String> config = new Map();
+		config.put ("creds", file[0]);
+
+		return config;
 	}
 
 	static public AOServer server = null;
 
-	static public void main (String[] args) throws IOException, FileNotFoundException {
+	static public void main (String[] args) throws IOException {
 		server = new AOServer ();
 		server.setConnection ("104.131.93.82", 27017);
-		Discord.initDiscord (getCreds());
+		Discord.initDiscord (getConfig());
 
 		Date next = new Date (new Date().getTime() + 45000);
 		while (true) {
