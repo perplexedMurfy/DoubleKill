@@ -1,9 +1,7 @@
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 //ao master server 104.131.93.82:27016
 //Offical Unoffical server 104.131.93.82:27017
@@ -39,10 +37,15 @@ public class Prog {
 		byte[] buffer = new byte[fin.available()];
 		fin.read (buffer);
 
-		String[] file = new String (buffer).split("\\n", 2);
+		String[] file = new String (buffer).split("\\n");
+		for (int i = 0; i < file.length; i++) {
+			file[i] = file[i].trim();
+		}
 
-		new Map<String, String> config = new Map();
+		Map config = new HashMap<String, String>();
 		config.put ("creds", file[0]);
+		config.put ("cmdPrefix", file[1]);
+		config.put ("privilegedRole", file[2]);
 
 		return config;
 	}
