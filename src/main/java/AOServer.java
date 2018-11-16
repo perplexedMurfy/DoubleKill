@@ -251,6 +251,7 @@ public class AOServer {
 					message.append (name);
 
 					//evidence
+					//TODO: get this working properly.
 					if (evidenceIndex != 0) {
 						try {
 							message.append(", presenting the " + evidenceNames[evidenceIndex - 1] + ",");
@@ -279,7 +280,9 @@ public class AOServer {
 
 					if (msg.trim().length() > 0) { //if message has content.
 						if (realize) { message.append (" realizes"); } //TODO: fix spelling
-						else if (textColor == 4) { message.append (" thinks"); }
+						else if (textColor == 4) { message.append (" thinks"); } //blue
+						else if (textColor == 5) { message.append (" broods"); } //yellow 
+						else if (textColor == 6) { message.append (" says in a gay manner"); } //rainbow
 						else { message.append (" says"); }
 						//TODO: add clause for not saying anything.
 
