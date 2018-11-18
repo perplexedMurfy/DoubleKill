@@ -224,8 +224,7 @@ public class AOServer {
 					//boolean desk = Integer.parseInt(packet.contents[1]) == 1;
 					String preEmote = packet.contents[2];
 					String name = packet.contents[3];
-					String emote = packet.contents[4]; //TODO: remove non-ascii and chara names
-					                                   //TODO: emote tense
+					String emote = packet.contents[4]; //TODO get a dictionary so I can properly parse the needed tense.
 					String msg = packet.contents[5];
 					String pos = packet.contents[6];
 					String sfxName = packet.contents[7];
@@ -244,19 +243,21 @@ public class AOServer {
 					                       (!preEmote.equals(emote)));
 					boolean doEmote = !emote.contains ("normal");
 
+					emote = emote.toLowerCase().replaceAll(name.toLowerCase(), "").replaceAll("[\\W^_]", "").replaceAll("(pre)+", "");
+					preEmote = preEmote.toLowerCase().replaceAll(name.toLowerCase(), "").replaceAll("[\\W^_]", "").replaceAll("(pre)+", "");
 
-					//PERSON of the POS {[presents THIS] <and> [SHOUTS]}, [acting EMOTE] <and> [saying MESSAGE], [acting out EMOTE afterwards]. 
+					//PERSON of the POS [presents THIS] <and> [SHOUTS], [acting EMOTE] <and> [saying MESSAGE], [acting out EMOTE afterwards]. 
 					StringBuilder message = new StringBuilder ();
 					//person
 					message.append (name);
 
 					//pos
 					if (pos.equals("wit")) { message.append (" at the witness stand"); }
-					else if (pos.equals("def")) { message.append (" form the attorney's desk"); }
-					else if (pos.equals("pro")) { message.append (" form the prosecution's desk"); }
-					else if (pos.equals("jud")) { message.append (" form the judge's bench"); }
-					else if (pos.equals("hld")) { message.append (" form the attorney's side"); }
-					else if (pos.equals("hlp")) { message.append (" form the prosecution's side"); }
+					else if (pos.equals("def")) { message.append (" from the attorney's desk"); }
+					else if (pos.equals("pro")) { message.append (" from the prosecution's desk"); }
+					else if (pos.equals("jud")) { message.append (" from the judge's bench"); }
+					else if (pos.equals("hld")) { message.append (" from the attorney's side"); }
+					else if (pos.equals("hlp")) { message.append (" from the prosecution's side"); }
 
 					//evidence
 					if (doEvidence) {
@@ -280,18 +281,18 @@ public class AOServer {
 					//pre emote (or single emote)
 					if (doEvidence || doShout) {
 						if (doPostEmote) { //make this the emote clause instead.
-							message.append (" while acting " + preEmote);
+							message.append (" while acting out " + preEmote);
 						}
 						else if (doEmote) {
-							message.append (" while acting " + emote);
+							message.append (" while acting out " + emote);
 						}
 					}
 					else {
 						if (doPostEmote) { //make this the emote clause instead.
-							message.append (" acts " + preEmote);
+							message.append (" acts out " + preEmote);
 						}
 						else if (doEmote) {
-							message.append (" acts " + emote);
+							message.append (" acts out " + emote);
 						}
 					}
 						
@@ -332,7 +333,7 @@ public class AOServer {
 
 					//emote
 					if (doPostEmote) {
-						message.append (" Acting " + emote + " afterwards.");
+						message.append (" Acting out " + emote + " afterwards.");
 					}
 
 					if (message.toString().length() < 2000) {
