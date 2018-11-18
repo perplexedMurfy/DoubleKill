@@ -224,7 +224,8 @@ public class AOServer {
 					//boolean desk = Integer.parseInt(packet.contents[1]) == 1;
 					String preEmote = packet.contents[2];
 					String name = packet.contents[3];
-					String emote = packet.contents[4];
+					String emote = packet.contents[4]; //TODO: remove non-ascii and chara names
+					                                   //TODO: emote tense
 					String msg = packet.contents[5];
 					String pos = packet.contents[6];
 					String sfxName = packet.contents[7];
@@ -236,70 +237,107 @@ public class AOServer {
 					boolean realize = Integer.parseInt(packet.contents[14]) == 1;
 					int textColor = Integer.parseInt(packet.contents[15]);
 
+					boolean doEvidence = evidenceIndex != 0;
+					boolean doShout = shoutMod != 0;
+					boolean doMessage = msg.trim().length() > 0;
+					boolean doPostEmote = ((!preEmote.equals("-")) &&
+					                       (!preEmote.equals(emote)));
+					boolean doEmote = !emote.contains ("normal");
+
+
+					//PERSON of the POS {[presents THIS] <and> [SHOUTS]}, [acting EMOTE] <and> [saying MESSAGE], [acting out EMOTE afterwards]. 
 					StringBuilder message = new StringBuilder ();
 					//person
 					message.append (name);
 
+					//pos
+					if (pos.equals("wit")) { message.append (" at the witness stand"); }
+					else if (pos.equals("def")) { message.append (" form the attorney's desk"); }
+					else if (pos.equals("pro")) { message.append (" form the prosecution's desk"); }
+					else if (pos.equals("jud")) { message.append (" form the judge's bench"); }
+					else if (pos.equals("hld")) { message.append (" form the attorney's side"); }
+					else if (pos.equals("hlp")) { message.append (" form the prosecution's side"); }
+
 					//evidence
-					//TODO: get this working properly.
-					if (evidenceIndex != 0) {
+					if (doEvidence) {
 						try {
-							message.append(", presenting the " + evidenceNames.get(evidenceIndex) + ",");
-						} catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
-							message.append (", presenting something,");
+							message.append(" presents the " + evidenceNames.get(evidenceIndex) );
+						} catch (NullPointerException | IndexOutOfBoundsException e) {
+							message.append (" presents something");
 						}
 					}
 
-					//pre emote
-					//TODO: do something with for *-pre and * emote pairs
-					if (preEmote.equals("-")) { //make this the emote clause instead.
-						message.append (" acts out " + emote + " then");
-					}
-					else if (!preEmote.contains("normal")) {
-						message.append (" acts out " + preEmote + " then");
+					if (doEvidence && doShout) { message.append (" and"); }
+
+					//shout
+					if (doShout) {
+						if (shoutMod == 1) { message.append (" shouts \"HOLD IT!\""); }
+						if (shoutMod == 2) { message.append (" shouts \"OBJECTION!\""); }
+						if (shoutMod == 3) { message.append (" shouts \"TAKE THAT!\""); }
+						if (shoutMod == 4) { message.append (" shouts something"); }
 					}
 
+					//pre emote (or single emote)
+					if (doEvidence || doShout) {
+						if (doPostEmote) { //make this the emote clause instead.
+							message.append (" while acting " + preEmote);
+						}
+						else if (doEmote) {
+							message.append (" while acting " + emote);
+						}
+					}
+					else {
+						if (doPostEmote) { //make this the emote clause instead.
+							message.append (" acts " + preEmote);
+						}
+						else if (doEmote) {
+							message.append (" acts " + emote);
+						}
+					}
+						
 
 					//type of message
-					if (shoutMod != 0) {
-						if (shoutMod == 1) { message.append (" shouts \"HOLD IT!\" and"); }
-						if (shoutMod == 2) { message.append (" shouts \"OBJECTION!\" and"); }
-						if (shoutMod == 3) { message.append (" shouts \"TAKE THAT!\" and"); }
-						if (shoutMod == 4) { message.append (" shouts something and"); }
-					}
-
-					if (msg.trim().length() > 0) { //if message has content.
-						if (realize) { message.append (" realizes"); } //TODO: fix spelling
-						else if (textColor == 4) { message.append (" thinks"); } //blue
-						else if (textColor == 5) { message.append (" broods"); } //yellow 
-						else if (textColor == 6) { message.append (" says in a gay manner"); } //rainbow
-						else { message.append (" says"); }
-						//TODO: add clause for not saying anything.
-
-						//pos
-						message.append (" from");
-						if (pos.equals("wit")) { message.append (" the witness stand"); }
-						else if (pos.equals("def")) { message.append (" the attorney's desk"); }
-						else if (pos.equals("pro")) { message.append (" the prosecution's desk"); }
-						else if (pos.equals("jud")) { message.append (" the judge's bench"); }
-						else if (pos.equals("hld")) { message.append (" the attorney's side"); }
-						else if (pos.equals("hlp")) { message.append (" the prosecution's side"); }
+					if (doMessage) { //if message has content.
+						if (doEmote || doPostEmote) {
+							if (realize) { message.append (" realizing"); }
+							else if (textColor == 4) { message.append (" thinking"); } //blue
+							else if (textColor == 5) { message.append (" brooding"); } //yellow 
+							else if (textColor == 6) { message.append (" saying in a gay manner"); } //rainbow
+							else { message.append (" saying"); }
+						}
+						else if (doEvidence && doShout) {
+							message.append (" while");
+							if (realize) { message.append (" realizing"); }
+							else if (textColor == 4) { message.append (" thinking"); } //blue
+							else if (textColor == 5) { message.append (" brooding"); } //yellow 
+							else if (textColor == 6) { message.append (" saying in a gay manner"); } //rainbow
+							else { message.append (" saying"); }
+						}
+						else {
+							if (realize) { message.append (" realizes"); }
+							else if (textColor == 4) { message.append (" thinks"); } //blue
+							else if (textColor == 5) { message.append (" broods"); } //yellow 
+							else if (textColor == 6) { message.append (" says in a gay manner"); } //rainbow
+							else { message.append (" says"); }
+						}
 
 						//message body
 						message.append (", \"" + msg + "\"");
 					}
-
-					//emote
-					if (!(emote.contains("normal") ||
-					      emote.equals(preEmote) ||
-					      preEmote.equals("-"))) { //this is so we don't emote caluse twice.
-						message.append (" while acting out " + emote);
+					else if (realize) {
+						message.append (" realizing something");
 					}
 
 					message.append (".");
 
-					if (message.length() < 2000);
-					Discord.boundChannel.sendMessage (message.toString()).queue();
+					//emote
+					if (doPostEmote) {
+						message.append (" Acting " + emote + " afterwards.");
+					}
+
+					if (message.toString().length() < 2000) {
+						Discord.boundChannel.sendMessage (message.toString()).queue();
+					}
 				}
 			}
 
