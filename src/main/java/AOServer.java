@@ -31,10 +31,11 @@ public class AOServer {
 	int musicListLen = 0;
 	String[] musics = null;
 
+	
 	int evidenceListLen = 0;
-	String[] evidenceNames = null;
-	String[] evidenceDesc = null;
-	String[] evidenceImg = null;
+	List<String> evidenceNames = new ArrayList ();
+	List<String> evidenceDesc  = new ArrayList ();
+	List<String> evidenceImg   = new ArrayList ();
 	
 	int defHP = 0;
 	int proHP = 0;
@@ -154,15 +155,7 @@ public class AOServer {
 			}
 
 			else if (packet.contents[0].equals("SI")) { //Server Info
-				charListLen     = Integer.parseInt (packet.contents[1]);
-				chars           = new String[charListLen];
-				charsTaken      = new boolean[charListLen];
-				evidenceListLen = Integer.parseInt (packet.contents[2]);
-				evidenceNames   = new String[evidenceListLen];
-				evidenceDesc    = new String[evidenceListLen];
-				evidenceImg     = new String[evidenceListLen];
-				musicListLen    = Integer.parseInt (packet.contents[3]);
-				musics          = new String[musicListLen];
+				//TODO: we might care about this later. for now, it's info serves no purpose.
 				sendPacket (new AOPacket ("RC#%", encryption)); //Request Characters
 			}
 
@@ -205,29 +198,26 @@ public class AOServer {
 			/** MeSsage
 			 * 0 MS
 			 * 1 chat - 1=no desk | 2=desk
-			 * 2 char_name
-			 * 3 pre_emote - emote before talking
+			 * 2 pre_emote - emote before talking
+			 * 3 char_name
 			 * 4 emote - emote while talking
 			 * 5 message
 			 * 6 side - wit, def, pro, jud, hld, hlp
-			 * 7 emote_mod - 0 no pre, become 2 with object
+			 * 7 sfx_name
+			 * 8 emote_mod - 0 no pre, become 2 with object
 			 *               1 pre + sfx
 			 *               2 pre + obj
 			 *               3 null
 			 *               4 null
 			 *               5 no pre, zoom
 			 *               6 no pre, obj + zoom
-			 * 8 char_id - index char is
-			 * 9 sfx_delay
-			 * 10 object_mod - 0 nothing
-			 *                 1 hold it
-			 *                 2 obj
-			 *                 3 take that
-			 *                 4 shout!
-			 * 11 evidence - 0=none | >1==present
-			 * 12 flip - bool
-			 * 13 realization - bool
-			 * 14 text_color - 0=w | 1=g | 2=r | 3=o | 4=b(think) | 5=yellow | 6=gay
+			 * 9 char_id - index char is
+			 * 10 sfx_delay
+			 * 11 shout_mod
+			 * 12 evidence_id
+			 * 13 flip - bool
+			 * 14 realization - bool
+			 * 15 text_color - 0=w | 1=g | 2=r | 3=o | 4=b(think) | 5=yellow | 6=gay
 			 */
 			else if (packet.contents[0].equals("MS")) {
 				if (Discord.boundChannel != null) {
@@ -237,12 +227,12 @@ public class AOServer {
 					String emote = packet.contents[4];
 					String msg = packet.contents[5];
 					String pos = packet.contents[6];
-					//int emoteMod = Integer.parseInt(packet.contents[7]);
+					String sfxName = packet.contents[7];
 					//don't care 8
 					//don't care 9
-					int objectionMod = Integer.parseInt(packet.contents[11]);
+					int shoutMod = Integer.parseInt(packet.contents[11]);
 					int evidenceIndex = Integer.parseInt(packet.contents[12]);
-					boolean flip = Integer.parseInt(packet.contents[13]) == 1;
+					//don't care 13
 					boolean realize = Integer.parseInt(packet.contents[14]) == 1;
 					int textColor = Integer.parseInt(packet.contents[15]);
 
@@ -254,7 +244,7 @@ public class AOServer {
 					//TODO: get this working properly.
 					if (evidenceIndex != 0) {
 						try {
-							message.append(", presenting the " + evidenceNames[evidenceIndex - 1] + ",");
+							message.append(", presenting the " + evidenceNames.get(evidenceIndex) + ",");
 						} catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
 							message.append (", presenting something,");
 						}
@@ -271,11 +261,11 @@ public class AOServer {
 
 
 					//type of message
-					if (objectionMod != 0) {
-						if (objectionMod == 1) { message.append (" shouts \"HOLD IT!\" and"); }
-						if (objectionMod == 2) { message.append (" shouts \"OBJECTION!\" and"); }
-						if (objectionMod == 3) { message.append (" shouts \"TAKE THAT!\" and"); }
-						if (objectionMod == 4) { message.append (" shouts something and"); }
+					if (shoutMod != 0) {
+						if (shoutMod == 1) { message.append (" shouts \"HOLD IT!\" and"); }
+						if (shoutMod == 2) { message.append (" shouts \"OBJECTION!\" and"); }
+						if (shoutMod == 3) { message.append (" shouts \"TAKE THAT!\" and"); }
+						if (shoutMod == 4) { message.append (" shouts something and"); }
 					}
 
 					if (msg.trim().length() > 0) { //if message has content.
@@ -344,9 +334,26 @@ public class AOServer {
 				
 			}
 
-			//TODO: test underlying string repersnetation, &'s should be there
+			//TODO: is there a client bug with malformed evidence?
+			//TODO: we could correct such automaticly, since it seems the stock client breaks on it.
 			else if (packet.contents[0].equals("LE")) { //List Evidence
-				//Sends the entire list of evidence for every update that's made for it.
+				evidenceNames.clear ();
+				evidenceDesc.clear ();
+				evidenceImg.clear ();
+				for (int i = 1; i < packet.contents.length; i++) {
+					String[] evi = packet.contents[i].split ("\\&");
+					try {
+						evidenceNames.add (evi[0]);
+						evidenceDesc.add (evi[1]);
+						evidenceImg.add (evi[2]);
+					}
+					catch (IndexOutOfBoundsException e) {
+						evidenceNames.add ("");
+						evidenceDesc.add ("");
+						evidenceImg.add ("");
+					}
+
+				}
 			}
 
 			else if (packet.contents[0].equals("CHECK")) {
