@@ -105,8 +105,14 @@ public class AOServer {
 		readPackets ();
 		AOPacket packet = null;
 		while ((packet = popPacket()) != null) {
-			
-			System.out.println ("    Receiving: " + packet);
+			if (packet.contents[0].equals ("CT")) {
+				packet.contents[1] = "REDACTED";
+				packet.contents[2] = "REDACTED";
+				System.out.println("    Receiving: " + packet);
+			}
+			else {
+				System.out.println("    Receiving: " + packet);
+			}
 			if (packet.contents[0].equals("decryptor")) {
 				String encryptedKey = packet.contents[1];
 
