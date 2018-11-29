@@ -242,105 +242,162 @@ public class AOServer {
 					boolean realize = Integer.parseInt(packet.contents[14]) == 1;
 					int textColor = Integer.parseInt(packet.contents[15]);
 
+
 					boolean doEvidence = evidenceIndex != 0;
 					boolean doShout = shoutMod != 0;
 					boolean doMessage = msg.trim().length() > 0;
 					boolean doPostEmote = ((!preEmote.equals("-")) &&
 					                       (!preEmote.equals(emote)));
 					boolean doEmote = !emote.contains ("normal");
+					boolean doSound = false;
 
+					//TODO: combine regexs
 					emote = emote.toLowerCase().replaceAll(name.toLowerCase(), "").replaceAll("[\\W^_]", "").replaceAll("(pre)+", "");
 					preEmote = preEmote.toLowerCase().replaceAll(name.toLowerCase(), "").replaceAll("[\\W^_]", "").replaceAll("(pre)+", "");
-
-					//PERSON of the POS [presents THIS] <and> [SHOUTS], [acting EMOTE] <and> [saying MESSAGE], [acting out EMOTE afterwards]. 
-					StringBuilder message = new StringBuilder ();
-					//person
-					message.append (name);
-
-					//pos
-					if (pos.equals("wit")) { message.append (" at the witness stand"); }
-					else if (pos.equals("def")) { message.append (" from the attorney's desk"); }
-					else if (pos.equals("pro")) { message.append (" from the prosecution's desk"); }
-					else if (pos.equals("jud")) { message.append (" from the judge's bench"); }
-					else if (pos.equals("hld")) { message.append (" from the attorney's side"); }
-					else if (pos.equals("hlp")) { message.append (" from the prosecution's side"); }
-
-					//evidence
+					String evidenceName = "pokemon";
+					String evidenceImgName = "missingno";
 					if (doEvidence) {
 						try {
-							message.append(" presents the " + evidenceNames.get(evidenceIndex) );
-						} catch (NullPointerException | IndexOutOfBoundsException e) {
-							message.append (" presents something");
+							evidenceName = evidenceNames.get(evidenceIndex - 1);
+							evidenceImgName = evidenceImg.get(evidenceIndex - 1);
+							if (evidenceImgName.contains ("char_icon") && evidenceImgName.contains ("..")) {
+								//The name should be the directory right above.
+								String mugName = evidenceImgName.replaceAll ("\\.\\.\\/characters\\/", "").replaceAll ("\\/char_icon.png", "");
+								evidenceImgName = "mugshot of " + mugName;
+							}
+							else {
+								if (evidenceImgName.contains ("\\") || evidenceImgName.contains("/")) {
+									evidenceImgName = evidenceImgName.replaceAll (".+(?=\\\\|\\/)", "").substring (1);
+								}
+							}
+							evidenceImgName = evidenceImgName.replaceAll ("\\..+", "");;
 						}
-					}
-
-					if (doEvidence && doShout) { message.append (" and"); }
-
-					//shout
-					if (doShout) {
-						if (shoutMod == 1) { message.append (" shouts \"HOLD IT!\""); }
-						if (shoutMod == 2) { message.append (" shouts \"OBJECTION!\""); }
-						if (shoutMod == 3) { message.append (" shouts \"TAKE THAT!\""); }
-						if (shoutMod == 4) { message.append (" shouts something"); }
-					}
-
-					//pre emote (or single emote)
-					if (doEvidence || doShout) {
-						if (doPostEmote) { //make this the emote clause instead.
-							message.append (" while acting out " + preEmote);
-						}
-						else if (doEmote) {
-							message.append (" while acting out " + emote);
-						}
-					}
-					else {
-						if (doPostEmote) { //make this the emote clause instead.
-							message.append (" acts out " + preEmote);
-						}
-						else if (doEmote) {
-							message.append (" acts out " + emote);
+						catch (Exception e) {
 						}
 					}
 						
 
+					//Form when doShout && doEvidence
+					//POS PERSON [Acts out EMOTE] shouts SHOUT and presents EVIDENCE, which looks like a EVIDENCEIMG. [Saying MESSAGE,] [They act out EMOTE afterwards].
+					//Co-Attorney Athena acts out happy, shouts "OBJECTION!" and presents 'The Golden Shitlog', which looks like a snackoo. Saying "this is a message", they act out point afterwards.
+					//Co-Attorney Athena acts out happy, shouts "OBJECTION!" and presents 'The Golden Shitlog', which looks like a snackoo. They act out point afterwards.
+
+					//Form when (doShout ^^ doEvidence) || !(doShout && doEvidence)
+					//POS PERSON [acts out EMOTE] <and> {shouts SHOUT}{presents EVIDENCE, which looks like a EVIDENCEIMG} <while> [Saying MESSAGE] <,> [they act out EMOTE afterwards].
+					//Co-Attorney Athena acts out happy and shouts "OBJECTION!" while saying "this is a message", they act out point afterwards.
+					//Co-Attorney Athena acts out happy and presents 'The Golden Shitlog', which looks like a sanckoo, while saying "this is a message", they act out point afterwards.
+					//Co-Attorney Athena acts out happy and shouts "OBJECTION!" acting out point afterwards.
+					//Co-Attorney Athena acts out happy while saying "this is a message", they act out point afterwards.
+					//Co-Attorney Athena acts out happy, they act out point afterwards.
+
+					//POS PERSON [acts out EMOTE] shouts SHOUT and presents EVIDENCE, which looks like a EVIDENCEIMG. [Saying MESSAGE,] [They act out EMOTE afterwards].
+					//POS PERSON [acts out EMOTE] <and> {shouts SHOUT}{presents EVIDENCE, which looks like a EVIDENCEIMG} <while> [Saying MESSAGE] <,> [they act out EMOTE afterwards].
+
+					//POS PERSON [acts out EMOTE] 1<,> 2<and> [Shouts SHOUT] 1<and> [presents EVIDENCE, which looks like a EVIDENCE] 1<.> 2<while> [Saying MESSAGE] 3<,> [they act out EMOTE afterwards].
+
+					StringBuilder message = new StringBuilder ();
+					//TODO: refactor this
+
+					//pos
+					if (pos.equals("wit"))      { message.append ("Witness"); }
+					else if (pos.equals("def")) { message.append ("Attorney"); }
+					else if (pos.equals("hld")) { message.append ("Co-Attorney"); }
+					else if (pos.equals("jud")) { message.append ("Judge"); }
+					else if (pos.equals("pro")) { message.append ("Prosecutor"); }
+					else if (pos.equals("hlp")) { message.append ("Co-Prosecutor"); }
+
+					//person
+					message.append (" " + name);
+
+					//pre emote (or single emote)
+					if (doPostEmote) { //make this the emote clause instead.
+						message.append (" acts out " + preEmote);
+						if (doShout && doEvidence)      { message.append (","); }
+						else if (doShout || doEvidence) { message.append (" and"); }
+					}
+					else if (doEmote) {
+						message.append (" acts out " + emote);
+						if (doShout && doEvidence)      { message.append (","); }
+						else if (doShout || doEvidence) { message.append (" and"); }
+					}
+
+					//shout
+					if (doShout) {
+						if (shoutMod == 1)      { message.append (" shouts \"HOLD IT!\""); }
+						else if (shoutMod == 2) { message.append (" shouts \"OBJECTION!\""); }
+						else if (shoutMod == 3) { message.append (" shouts \"TAKE THAT!\""); }
+						else if (shoutMod == 4) { message.append (" shouts something"); }
+
+						if (doEvidence) { message.append (" and"); }
+					}
+
+					//evidence
+					if (doEvidence) { //TODO: account for evidence.
+						message.append(" presents the '" + evidenceName + "', which looks like a " + evidenceImgName);
+						if (doShout) { message.append ("."); }
+						else { message.append (","); }
+					}
+
 					//type of message
 					if (doMessage) { //if message has content.
-						if (doEmote || doPostEmote) {
-							if (realize) { message.append (" realizing"); }
-							else if (textColor == 4) { message.append (" thinking"); } //blue
-							else if (textColor == 5) { message.append (" brooding"); } //yellow 
-							else if (textColor == 6) { message.append (" saying in a gay manner"); } //rainbow
-							else { message.append (" saying"); }
+						if (doEvidence && doShout) { //It is the beginning of a sentence
+							message.append (" They");
+							if (realize)             { message.append (" realize"); }
+							else if (textColor == 4) { message.append (" think"); } //blue
+							else if (textColor == 5) { message.append (" brood"); } //yellow 
+							else if (textColor == 6) { message.append (" say in a gay manner"); } //rainbow
+							else                     { message.append (" say"); }
 						}
-						else if (doEvidence && doShout) {
-							message.append (" while");
-							if (realize) { message.append (" realizing"); }
-							else if (textColor == 4) { message.append (" thinking"); } //blue
-							else if (textColor == 5) { message.append (" brooding"); } //yellow 
-							else if (textColor == 6) { message.append (" saying in a gay manner"); } //rainbow
-							else { message.append (" saying"); }
-						}
-						else {
-							if (realize) { message.append (" realizes"); }
+						else if ((!doEvidence && !doShout)) {
+							if (doEmote || doPostEmote) { message.append (" and"); }
+
+							if (realize)             { message.append (" realizes"); }
 							else if (textColor == 4) { message.append (" thinks"); } //blue
 							else if (textColor == 5) { message.append (" broods"); } //yellow 
 							else if (textColor == 6) { message.append (" says in a gay manner"); } //rainbow
-							else { message.append (" says"); }
+							else                     { message.append (" says"); }
+						}
+						else {
+							message.append (" while");
+							if (realize)             { message.append (" realizing"); }
+							else if (textColor == 4) { message.append (" thinking"); } //blue
+							else if (textColor == 5) { message.append (" brooding"); } //yellow 
+							else if (textColor == 6) { message.append (" saying in a gay manner"); } //rainbow
+							else                     { message.append (" saying"); }
 						}
 
 						//message body
 						message.append (", \"" + msg + "\"");
 					}
 					else if (realize) {
-						message.append (" realizing something");
+						if (doEvidence && doShout) {
+							message.append (" They realize something");
+						}
+						else if ((!doEvidence && !doShout)) {
+							message.append (" while realizing something");
+						}
 					}
-
-					message.append (".");
 
 					//emote
 					if (doPostEmote) {
-						message.append (" Acting out " + emote + " afterwards.");
+						if (!doMessage && (!doEvidence && !doShout)) {
+							message.append (" and acts out " + emote + " afterwards");
+						}
+						else if (doMessage && (!doEvidence && !doShout)) {
+							message.append (", acting out " + emote + " afterwards");
+						}
+						else if (!doMessage && (doEvidence && doShout)) {
+							message.append (" They act out" + emote + " afterwards");
+						}
+						else if (doMessage && (doEvidence && doShout)) {
+							message.append (" and act out" + emote + " afterwards");
+						}
+						else if (doMessage && (doEvidence || doShout)) { //TODO: check logic on this 
+							message.append(" acting out " + emote + " afterwards");
+						}
 					}
+
+					message.append (".");
 
 					if (message.toString().length() < 2000) {
 						Discord.boundChannel.sendMessage (message.toString()).queue();
@@ -349,12 +406,10 @@ public class AOServer {
 			}
 
 			else if (packet.contents[0].equals("CT")) { //CommunicaTe
-
+				//TODO: ignore this, better?
 			}
 
 			else if (packet.contents[0].equals("MC")) { //Music Change
-				//TODO: wanna play music too?
-				//System.out.println (packet.contents[2] + " Changed the song to " + packet.contents[1]);
 			}
 
 			else if (packet.contents[0].equals("PV")) {
