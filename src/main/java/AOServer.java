@@ -98,6 +98,12 @@ public class AOServer {
 		os = sock.getOutputStream ();
 	}
 
+	/** Closes connection to a server
+	 */
+	public void close () throws IOException {
+		sock.close (); //TODO: confirm that AO doesn't do anything on a clean disconnect.
+	}
+
 	/** Polls all packets in `packetQueue`
 	 */
 	public void pollPackets () throws IOException {

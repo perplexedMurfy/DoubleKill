@@ -20,50 +20,65 @@ public class Prog {
 		
 		byte out = 0;
 		List<Byte> result = new ArrayList();
-			for (int i = 0; i < bytes_in.length; i++) {
-				int in = (int)bytes_in[i];
-				//encryption / decryption
-				out = (byte)(in ^ Integer.remainderUnsigned((key >>> 8), 256));
-				key = (Byte.toUnsignedInt(out) + key) * k1 + k2;
-				
-				result.add (out);
-			}
+		for (int i = 0; i < bytes_in.length; i++) {
+			int in = (int)bytes_in[i];
+			//encryption / decryption
+			out = (byte)(in ^ Integer.remainderUnsigned((key >>> 8), 256));
+			key = (Byte.toUnsignedInt(out) + key) * k1 + k2;
+			
+			result.add (out);
+		}
 		
 		return result;
 	}
-
+	
 	static Map<String, String> getConfig() throws IOException {
 		FileInputStream fin = new FileInputStream("config.txt");
 		byte[] buffer = new byte[fin.available()];
 		fin.read (buffer);
-
+		
 		String[] file = new String (buffer).split("\\n");
 		for (int i = 0; i < file.length; i++) {
 			file[i] = file[i].trim();
 		}
-
+		
 		Map config = new HashMap<String, String>();
 		config.put ("creds", file[0]);
 		config.put ("cmdPrefix", file[1]);
 		config.put ("privilegedRole", file[2]);
-
+		
 		return config;
 	}
-
+	
 	static public AOServer server = null;
 
 	static public void main (String[] args) throws IOException {
-		server = new AOServer ();
-		server.setConnection ("104.131.93.82", 27017);
-		Discord.initDiscord (getConfig());
-
-		Date next = new Date (new Date().getTime() + 45000);
-		while (true) {
-			if (new Date().after(next)) {
-				server.sendKeepAlive ();
-				next = new Date (new Date().getTime() + 45000);
+		boolean exit = false;
+		boolean recovery = false;
+		Exception lastExcept = null;
+		while (!exit) {
+			try {
+				server = new AOServer ();
+				server.setConnection ("104.131.93.82", 27017);
+				Discord.initDiscord (getConfig(), lastExcept); //Might have to make a check to ensure Prog.sever has a connection before initing because of autocmds.
+				
+				Date next = new Date (new Date().getTime() + 45000);
+				while (true) {
+					if (new Date().after(next)) {
+						server.sendKeepAlive ();
+						next = new Date (new Date().getTime() + 45000);
+					}
+					server.pollPackets ();
+				}
 			}
-			server.pollPackets ();
+			catch (Exception e) {
+				System.out.println (lastExcept);
+				recovery = true;
+				lastExcept = e;
+				server.close ();
+				Discord.shutdown ();
+				System.out.println ();
+			}
 		}
 	}
 }
