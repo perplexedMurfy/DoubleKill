@@ -1,18 +1,14 @@
 import java.net.*;
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 public class AOServer {
 	//start server state
+	//This is all the stuff that a normal client would want to keep track of
 
-	//"a totally random string
+	//"a totally random string,
 	//what could possibly go wrong."
 	// --AO2 client's source
-	//TODO: actually get the hdid, or whatever it _actually_ wants.
-	//TODO: wait, is this really good enough?
-	//TODO: yeah, I think it's good enough. maybe we should generate it anyways, just for fun.
 	String hwid = "12ASDG235GHAKl";
 	int serverKey = 0;
 	boolean encryption = true;
@@ -42,25 +38,73 @@ public class AOServer {
 	//end server state
 
 	Socket sock = null;
-	InputStream is = null;  ///to the socket
-	OutputStream os = null; ///from the socket
+	InputStream is = null;
+	OutputStream os = null;
 	List<AOPacket> packetQueue = new ArrayList ();
 
+	Map playerInfo = new HashMap<Integer, String>();
+
 	/** Reads packets from the socket into the packetQueue
+	 * If a packet is large enough that it is split into more than 1
+	 * part, it is recombined here.  incomplete packets are stored in
+	 * `_carryBuffer`, which behaves like a FIFO stack. It is assumed
+	 * that either incomplete packets will complete themselves in this
+	 * order, or that there will only be one packet that needs to be
+	 * combined at a time.
+	 *
+	 * A packet part in the carry buffer will have it's header, while
+	 * it's completing packet part will lack one. When the latter is
+	 * encountered in the packetQueue loop it will remove the first
+	 * element of the carry buffer and concatinate the parts into one
+	 * working packet.
+	 *
+	 * Note: `_carryBuffer` should only be used in this function.
 	 */
+	List<String> _carryBuffer = new ArrayList ();
 	void readPackets () throws IOException {
-		byte[] buffer = new byte[is.available()];
 		if (is.available() >= 2) {
-			is.read(buffer);
+			byte[] buffer = new byte[is.available()];
+			is.read (buffer);
+			String str_buffer = new String (buffer);
 			
-			String[] packet = new String(buffer).split("\\#\\%");
-			//TODO: Remove empty bit left over...
-			for (int i = 0; i < packet.length; i++) {
-				if (!((packet[i].length() == 0) || (packet[i].charAt(0) == '\u0000'))) {
-					packetQueue.add(new AOPacket(packet[i] + "#%", false)); //reappends the ending.
+			String[] packets = str_buffer.split("\\#\\%");
+			if (str_buffer.charAt(str_buffer.length() - 1) != '%') {
+				_carryBuffer.add(packets[packets.length - 1]);
+				packets[packets.length - 1] = null;
+			}
+			
+			for (int i = 0; i < packets.length; i++) {
+				if (!((packets[i] == null) || (packets[i].isEmpty()) || (packets[i].charAt(0) == '\u0000'))) {
+					if (hasValidHeader(packets[i])) {
+						packetQueue.add(new AOPacket(packets[i] + "#%", false));
+					}
+					else {
+						String buf = new String ();
+						for (String s : _carryBuffer) {
+							buf += s;
+						}
+						_carryBuffer.clear ();
+						packetQueue.add (new AOPacket (buf + packets[i] + "#%", false));
+					}
 				}
 			}
 		}
+	}
+
+
+	boolean hasValidHeader (String packet) {
+		try { packet = packet.substring (0, packet.indexOf("#")); }
+		catch (IndexOutOfBoundsException e) {} //contentless packets will trip this
+		finally {
+			//This should be every packet header, according to https://github.com/AttorneyOnline/AO2Protocol
+			if (packet.matches ("decryptor|askchaa|CharsCheck|OPPASS|DONE|CHECK|" + //long headers
+								"HI|ID|PN|FL|SI|RC|SC|RM|SM|RD|CC|PV|MS|CT|MC|RT|HP|BN|PE|DE|EE|LE|CH|ZZ|IL|MU|KK|KB|DB|" + //short headers
+			                    "SV|PING|ALL|SN|VC|NOSERV|SCC|PSDD|DOOM|" + //master server headers
+			                    "MM")) { //undocumented headers
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	AOPacket popPacket () {
@@ -111,14 +155,14 @@ public class AOServer {
 		readPackets ();
 		AOPacket packet = null;
 		while ((packet = popPacket()) != null) {
+
 			if (packet.contents[0].equals ("CT")) {
 				packet.contents[1] = "REDACTED";
 				packet.contents[2] = "REDACTED";
-				System.out.println("    Receiving: " + packet);
 			}
-			else {
-				System.out.println("    Receiving: " + packet);
-			}
+
+			System.out.println("    Receiving: " + packet);
+
 			if (packet.contents[0].equals("decryptor")) {
 				String encryptedKey = packet.contents[1];
 
@@ -147,7 +191,7 @@ public class AOServer {
 				if (packet.contents.length == 4) { //optional piece of data.
 					serverVersion = packet.contents[3];
 				}
-				sendPacket (new AOPacket ("ID#AO2#2.4.10#%", true));
+				sendPacket (new AOPacket ("ID#AO2#2.4.10#%", true)); //more like protocol version, rather than program version.
 			}
 
 			else if (packet.contents[0].equals("PN")) { //Player Number
@@ -159,10 +203,9 @@ public class AOServer {
 			else if (packet.contents[0].equals("FL")) { //Feature List
 				for (String s : packet.contents) {
 					if (s.equals ("noencryption")) {
-						encryption = false; //TODO: use this to determine if encryption of packets is nessary
+						encryption = false;
 					}
 				}
-				//I think this is the last packet in the handshake, it's time to askchaa
 				sendPacket (new AOPacket ("askchaa#%", encryption)); //TODO: what should I do if we don't get a FL packet?
 			}
 
@@ -446,6 +489,7 @@ public class AOServer {
 				evidenceNames.clear ();
 				evidenceDesc.clear ();
 				evidenceImg.clear ();
+				boolean isDirty = false; //There's a bug where null evidence is
 				for (int i = 1; i < packet.contents.length; i++) {
 					String[] evi = packet.contents[i].split ("\\&");
 					try {
@@ -454,11 +498,11 @@ public class AOServer {
 						evidenceImg.add (evi[2]);
 					}
 					catch (IndexOutOfBoundsException e) {
-						evidenceNames.add ("");
-						evidenceDesc.add ("");
-						evidenceImg.add ("");
+						isDirty = true;
 					}
-
+					if (isDirty) {
+						//sendPacket(new AOPacket("DE#"#%", encryption));
+					}
 				}
 			}
 
@@ -480,11 +524,12 @@ public class AOServer {
 
 			else if (packet.contents[0].equals("MU")) { //Mute User
 				//Ignored...
-				//TODO: can we ignore a user's mute status?
+				//No reason to want to mute someone.
 			}
 
 			else if (packet.contents[0].equals("UM")) { //UnMute user
 				//Ignored...
+				//No reason to want to mute someone.
 			}
 
 			else if (packet.contents[0].equals("KK")) { //Kick Klient

@@ -8,8 +8,6 @@ import java.util.stream.Collectors;
 public class AOPacket {
 	public String[] contents;///contents of packet, split by #'s. The first entry is the header.
 	public boolean encrypted;    ///wheather the header should be encrypted or not.
-	public boolean complete;     ///wheather the packet needs more infomation to be compleate.
-	//TODO: allow for appending of packets that are not complete.
 	
 	/** Makes a empty packet
 	 */
