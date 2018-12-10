@@ -453,10 +453,18 @@ public class AOServer {
 			}
 
 			else if (packet.contents[0].equals("CT")) { //CommunicaTe
-				//TODO: ignore this, better?
 			}
 
 			else if (packet.contents[0].equals("MC")) { //Music Change
+				if (Discord.boundChannel != null && !packet.contents[2].equals("-1")) {
+					String name = (String) playerInfo.get (Integer.parseInt (packet.contents[2]));
+					String songName = packet.contents[1].replaceAll(".+(?=\\\\|\\/)", ""); //removes file extention
+					if (name == null) {
+						name = "Someone";
+					}
+
+					Discord.boundChannel.sendMessage (name + " has started playing " + songName + " on the courtroom jukebox.").queue();
+				}
 			}
 
 			else if (packet.contents[0].equals("PV")) {
