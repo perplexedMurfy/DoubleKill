@@ -279,18 +279,20 @@ public class AOServer {
 					//boolean desk = Integer.parseInt(packet.contents[1]) == 1;
 					String preEmote = packet.contents[2];
 					String name = packet.contents[3];
-					String emote = packet.contents[4]; //TODO get a dictionary so I can properly parse the needed tense.
+					String emote = packet.contents[4];
 					String msg = packet.contents[5];
 					String pos = packet.contents[6];
-					String sfxName = packet.contents[7];
+					String sfxName = packet.contents[7]; //TODO: work this into the grammer?
 					//don't care 8
-					//don't care 9
+					int playerId = Integer.parseInt(packet.contents[9]);
+					//don't care 10
 					int shoutMod = Integer.parseInt(packet.contents[11]);
 					int evidenceIndex = Integer.parseInt(packet.contents[12]);
 					//don't care 13
 					boolean realize = Integer.parseInt(packet.contents[14]) == 1;
 					int textColor = Integer.parseInt(packet.contents[15]);
 
+					playerInfo.put (playerId, name);
 
 					boolean doEvidence = evidenceIndex != 0;
 					boolean doShout = shoutMod != 0;
@@ -305,7 +307,7 @@ public class AOServer {
 					preEmote = preEmote.toLowerCase().replaceAll(name.toLowerCase(), "").replaceAll("[\\W^_]", "").replaceAll("(pre)+", "");
 					String evidenceName = "pokemon";
 					String evidenceImgName = "missingno";
-					if (doEvidence) {
+					if (doEvidence) { //TODO: do something about emotes being used as evidence.
 						try {
 							evidenceName = evidenceNames.get(evidenceIndex - 1);
 							evidenceImgName = evidenceImg.get(evidenceIndex - 1);
@@ -316,10 +318,10 @@ public class AOServer {
 							}
 							else {
 								if (evidenceImgName.contains ("\\") || evidenceImgName.contains("/")) {
-									evidenceImgName = evidenceImgName.replaceAll (".+(?=\\\\|\\/)", "").substring (1);
+									evidenceImgName = evidenceImgName.replaceAll (".+(?=\\\\|\\/)", "").substring (1); //removes file extention
 								}
 							}
-							evidenceImgName = evidenceImgName.replaceAll ("\\..+", "");;
+							evidenceImgName = evidenceImgName.replaceAll ("\\..+", "");; //removes path related stuff
 						}
 						catch (Exception e) {
 						}
@@ -328,20 +330,11 @@ public class AOServer {
 
 					//Form when doShout && doEvidence
 					//POS PERSON [Acts out EMOTE] shouts SHOUT and presents EVIDENCE, which looks like a EVIDENCEIMG. [Saying MESSAGE,] [They act out EMOTE afterwards].
-					//Co-Attorney Athena acts out happy, shouts "OBJECTION!" and presents 'The Golden Shitlog', which looks like a snackoo. Saying "this is a message", they act out point afterwards.
-					//Co-Attorney Athena acts out happy, shouts "OBJECTION!" and presents 'The Golden Shitlog', which looks like a snackoo. They act out point afterwards.
 
 					//Form when (doShout ^^ doEvidence) || !(doShout && doEvidence)
 					//POS PERSON [acts out EMOTE] <and> {shouts SHOUT}{presents EVIDENCE, which looks like a EVIDENCEIMG} <while> [Saying MESSAGE] <,> [they act out EMOTE afterwards].
-					//Co-Attorney Athena acts out happy and shouts "OBJECTION!" while saying "this is a message", they act out point afterwards.
-					//Co-Attorney Athena acts out happy and presents 'The Golden Shitlog', which looks like a sanckoo, while saying "this is a message", they act out point afterwards.
-					//Co-Attorney Athena acts out happy and shouts "OBJECTION!" acting out point afterwards.
-					//Co-Attorney Athena acts out happy while saying "this is a message", they act out point afterwards.
-					//Co-Attorney Athena acts out happy, they act out point afterwards.
 
-					//POS PERSON [acts out EMOTE] shouts SHOUT and presents EVIDENCE, which looks like a EVIDENCEIMG. [Saying MESSAGE,] [They act out EMOTE afterwards].
-					//POS PERSON [acts out EMOTE] <and> {shouts SHOUT}{presents EVIDENCE, which looks like a EVIDENCEIMG} <while> [Saying MESSAGE] <,> [they act out EMOTE afterwards].
-
+					//Combined form
 					//POS PERSON [acts out EMOTE] 1<,> 2<and> [Shouts SHOUT] 1<and> [presents EVIDENCE, which looks like a EVIDENCE] 1<.> 2<while> [Saying MESSAGE] 3<,> [they act out EMOTE afterwards].
 
 					StringBuilder message = new StringBuilder ();
@@ -350,10 +343,10 @@ public class AOServer {
 					//pos
 					if (pos.equals("wit"))      { message.append ("Witness"); }
 					else if (pos.equals("def")) { message.append ("Attorney"); }
-					else if (pos.equals("hld")) { message.append ("Co-Attorney"); }
+					else if (pos.equals("hld")) { message.append ("Co-Council"); }
 					else if (pos.equals("jud")) { message.append ("Judge"); }
 					else if (pos.equals("pro")) { message.append ("Prosecutor"); }
-					else if (pos.equals("hlp")) { message.append ("Co-Prosecutor"); }
+					else if (pos.equals("hlp")) { message.append ("Prosecutor's aide"); }
 
 					//person
 					message.append (" " + name);
@@ -392,7 +385,7 @@ public class AOServer {
 						if (doEvidence && doShout) { //It is the beginning of a sentence
 							message.append (" They");
 							if (realize)             { message.append (" realize"); }
-							else if (textColor == 4) { message.append (" think"); } //blue
+							else if (textColor == 4) { message.append (" say under their breath"); } //blue
 							else if (textColor == 5) { message.append (" brood"); } //yellow 
 							else if (textColor == 6) { message.append (" say in a gay manner"); } //rainbow
 							else                     { message.append (" say"); }
@@ -401,7 +394,7 @@ public class AOServer {
 							if (doEmote || doPostEmote) { message.append (" and"); }
 
 							if (realize)             { message.append (" realizes"); }
-							else if (textColor == 4) { message.append (" thinks"); } //blue
+							else if (textColor == 4) { message.append (" says under their breath"); } //blue
 							else if (textColor == 5) { message.append (" broods"); } //yellow 
 							else if (textColor == 6) { message.append (" says in a gay manner"); } //rainbow
 							else                     { message.append (" says"); }
@@ -409,7 +402,7 @@ public class AOServer {
 						else {
 							message.append (" while");
 							if (realize)             { message.append (" realizing"); }
-							else if (textColor == 4) { message.append (" thinking"); } //blue
+							else if (textColor == 4) { message.append (" saying under their breath"); } //blue
 							else if (textColor == 5) { message.append (" brooding"); } //yellow 
 							else if (textColor == 6) { message.append (" saying in a gay manner"); } //rainbow
 							else                     { message.append (" saying"); }
@@ -444,6 +437,11 @@ public class AOServer {
 						else if (doMessage && (doEvidence || doShout)) { //TODO: check logic on this 
 							message.append(" acting out " + emote + " afterwards");
 						}
+					}
+
+					//special "empty" message text.
+					if (!(doEvidence || doShout || doMessage || doPostEmote || doEmote || doSound)) {
+						message.append (" just stands there, waiting");
 					}
 
 					message.append (".");
