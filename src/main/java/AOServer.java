@@ -44,6 +44,12 @@ public class AOServer {
 
 	Map playerInfo = new HashMap<Integer, String>();
 
+	static final String[] RAND_AREACHANGE_MSGS = {"The area has been changed to %s.",
+	                                              "Land Card \"%s\" was played!",
+	                                              "Road Trip! Road Trip! Let's go to %s!",
+	                                              "The world melts around us. We're now located in %s.",
+	                                              "Go directly to %s. Do not pass GO, Do not collect $200."};
+
 	/** Reads packets from the socket into the packetQueue
 	 * If a packet is large enough that it is split into more than 1
 	 * part, it is recombined here.  incomplete packets are stored in
@@ -98,7 +104,7 @@ public class AOServer {
 		finally {
 			//This should be every packet header, according to https://github.com/AttorneyOnline/AO2Protocol
 			if (packet.matches ("decryptor|askchaa|CharsCheck|OPPASS|DONE|CHECK|" + //long headers
-								"HI|ID|PN|FL|SI|RC|SC|RM|SM|RD|CC|PV|MS|CT|MC|RT|HP|BN|PE|DE|EE|LE|CH|ZZ|IL|MU|KK|KB|DB|" + //short headers
+			                    "HI|ID|PN|FL|SI|RC|SC|RM|SM|RD|CC|PV|MS|CT|MC|RT|HP|BN|PE|DE|EE|LE|CH|ZZ|IL|MU|KK|KB|DB|" + //short headers
 			                    "SV|PING|ALL|SN|VC|NOSERV|SCC|PSDD|DOOM|" + //master server headers
 			                    "MM")) { //undocumented headers
 				return true;
@@ -250,7 +256,7 @@ public class AOServer {
 				//System.out.println ("Server Handshake is Done!");
 			}
 
-			/** MeSsage
+			/** MeSsage (received ver.)
 			 * 0 MS
 			 * 1 chat - 1=no desk | 2=desk
 			 * 2 pre_emote - emote before talking
@@ -268,31 +274,46 @@ public class AOServer {
 			 *               6 no pre, obj + zoom
 			 * 9 char_id - index char is
 			 * 10 sfx_delay
-			 * 11 shout_mod
-			 * 12 evidence_id
+			 * 11 shout_mod - int
+			 * 12 evidence_id - int
 			 * 13 flip - bool
 			 * 14 realization - bool
-			 * 15 text_color - 0=w | 1=g | 2=r | 3=o | 4=b(think) | 5=yellow | 6=gay
+			 * 15 text_color - 0=w | 1=g | 2=r | 3=o | 4=b | 5=y | 6=gay | 7=p | c=8 | [gray=9; Murfy addition, not offical]
+			 * CCCCEXT
+			 * 16 Showname - String
+			 * 17 Paired Char ID - int
+			 * 18 Paired Char Name - String
+			 * 19 Paired Emote - String
+			 * 20 SelfOffset - int
+			 * 21 Paired Offset - int
+			 * 22 Paired Flip - int
+			 * 23 SpeakWithoutWaiting - bool
 			 */
 			else if (packet.contents[0].equals("MS")) {
 				if (Discord.boundChannel != null) {
-					//boolean desk = Integer.parseInt(packet.contents[1]) == 1;
+					//boolean desk = Integer.parseInt(packet.contents[1]) != 0;
 					String preEmote = packet.contents[2];
 					String name = packet.contents[3];
 					String emote = packet.contents[4];
 					String msg = packet.contents[5];
 					String pos = packet.contents[6];
 					String sfxName = packet.contents[7]; //TODO: work this into the grammer?
-					//don't care 8
-					int playerId = Integer.parseInt(packet.contents[9]);
-					//don't care 10
+					int emoteMod = Integer.parseInt (packet.contents[8]);
+					int id = Integer.parseInt(packet.contents[9]); //of the char, not playerId
+					int sfxDelay = Integer.parseInt (packet.contents[10]);
 					int shoutMod = Integer.parseInt(packet.contents[11]);
 					int evidenceIndex = Integer.parseInt(packet.contents[12]);
-					//don't care 13
-					boolean realize = Integer.parseInt(packet.contents[14]) == 1;
+					boolean flip = Integer.parseInt (packet.contents[13]) != 0;
+					boolean realize = Integer.parseInt(packet.contents[14]) != 0;
 					int textColor = Integer.parseInt(packet.contents[15]);
-
-					playerInfo.put (playerId, name);
+					String showName = packet.contents[16];
+					int pairId = Integer.parseInt(packet.contents[17]);
+					String pairName = packet.contents[18];
+					String pairEmote = packet.contents[19];
+					int offset = Integer.parseInt(packet.contents[20]);
+					int pairOffset = Integer.parseInt(packet.contents[21]);
+					boolean pairFlip = Integer.parseInt (packet.contents[22]) != 0;
+					boolean speakWithoutWaiting = Integer.parseInt (packet.contents[22]) != 0;
 
 					boolean doEvidence = evidenceIndex != 0;
 					boolean doShout = shoutMod != 0;
@@ -300,11 +321,43 @@ public class AOServer {
 					boolean doPostEmote = ((!preEmote.equals("-")) &&
 					                       (!preEmote.equals(emote)));
 					boolean doEmote = !emote.contains ("normal");
-					boolean doSound = false;
+					boolean doSfx = !doShout && !sfxName.isEmpty();
+					boolean soundClause = (doSfx || doShout);
+					boolean isOOC = false;
+					int textSpeedMod = 0; //not exactly what we want, but I think it'll work in most cases.
+					textSpeedMod += msg.split("\\}", -1).length-1; //Counts number of '{' in a string
+					textSpeedMod -= msg.split("\\{", -1).length-1; //Counts number of '}' in a string
+					msg = msg.replaceAll("\\{", "");
+					msg = msg.replaceAll("\\}", "");
+
+					if ((msg.charAt(0) == '(' && msg.charAt(1) == '(') ||
+					    (msg.charAt(0) == '[' && msg.charAt(1) == '[') ||
+					    (msg.charAt(0) == '/' && msg.charAt(1) == '/')) {
+						isOOC = true;
+						msg = msg.replace("((", "");
+						msg = msg.replace("))", "");
+						msg = msg.replace("[[", "");
+						msg = msg.replace("]]", "");
+						msg = msg.replace("//", "");
+					}
+
+					if (!isOOC && (msg.charAt(0) == '(' && msg.charAt(msg.length()-1) == ')')) {
+						textColor = 4;
+						msg = msg.substring (1, msg.length()-1);
+					}
+					else if (!isOOC && (msg.charAt(0) == '[' && msg.charAt(msg.length()-1) == ']')) {
+						textColor = 9;
+						msg = msg.substring (1, msg.length()-1);
+					}
+
+					msg = msg.replace ("*", "\\*");
+					msg = msg.replace ("_", "\\_");
+					msg = msg.replace ("|", "*");
 
 					//TODO: combine regexs
 					emote = emote.toLowerCase().replaceAll(name.toLowerCase(), "").replaceAll("[\\W^_]", "").replaceAll("(pre)+", "");
 					preEmote = preEmote.toLowerCase().replaceAll(name.toLowerCase(), "").replaceAll("[\\W^_]", "").replaceAll("(pre)+", "");
+					sfxName = sfxName.toLowerCaes().repalceAll("\\.(.*)", "");
 					String evidenceName = "pokemon";
 					String evidenceImgName = "missingno";
 					if (doEvidence) { //TODO: do something about emotes being used as evidence.
@@ -314,6 +367,7 @@ public class AOServer {
 							if (evidenceImgName.contains ("char_icon") && evidenceImgName.contains ("..")) {
 								//The name should be the directory right above.
 								String mugName = evidenceImgName.replaceAll ("\\.\\.\\/characters\\/", "").replaceAll ("\\/char_icon.png", "");
+								String mugName = packet.contents[1].replaceAll("\\.(.*)", ""); //removes file extention
 								evidenceImgName = "mugshot of " + mugName;
 							}
 							else {
@@ -321,12 +375,18 @@ public class AOServer {
 									evidenceImgName = evidenceImgName.replaceAll (".+(?=\\\\|\\/)", "").substring (1); //removes file extention
 								}
 							}
+							//TODO: is this correct?
 							evidenceImgName = evidenceImgName.replaceAll ("\\..+", "");; //removes path related stuff
 						}
 						catch (Exception e) {
 						}
 					}
-						
+
+					if (!showName.isEmpty() && !showName.equals(name)) {
+						name += "(" + showName + ")";
+					}
+
+					playerInfo.put (id, name);
 
 					//Form when doShout && doEvidence
 					//POS PERSON [Acts out EMOTE] shouts SHOUT and presents EVIDENCE, which looks like a EVIDENCEIMG. [Saying MESSAGE,] [They act out EMOTE afterwards].
@@ -335,7 +395,7 @@ public class AOServer {
 					//POS PERSON [acts out EMOTE] <and> {shouts SHOUT}{presents EVIDENCE, which looks like a EVIDENCEIMG} <while> [Saying MESSAGE] <,> [they act out EMOTE afterwards].
 
 					//Combined form
-					//POS PERSON [acts out EMOTE] 1<,> 2<and> [Shouts SHOUT] 1<and> [presents EVIDENCE, which looks like a EVIDENCE] 1<.> 2<while> [Saying MESSAGE] 3<,> [they act out EMOTE afterwards].
+					//POS PERSON [, who is next to PAIRPERSON] [acts out EMOTE] 1<,> 2<and> [Shouts SHOUT] 1<and> [presents EVIDENCE, which looks like a EVIDENCE] 1<.> 2<while> [Saying MESSAGE] 3<,> [they act out EMOTE afterwards].
 
 					StringBuilder message = new StringBuilder ();
 					//TODO: refactor this
@@ -349,7 +409,25 @@ public class AOServer {
 					else if (pos.equals("hlp")) { message.append ("Prosecutor's aide"); }
 
 					//person
-					message.append (" " + name);
+					if (isOOC) {
+						if (!showName.isEmpty() && !showName.equals(name)) {
+							message.append (" " + showName);
+						}
+						else {
+							message.append (" " + name);
+						}
+					}
+					else {
+						message.append (" " + name);
+						if (pairId != id && pairId != -1) { //TODO: confirm how we are sent this data
+							if (playerInfo.get(pairId) != null) {
+								message.append (", who is next to " + playerInfo.get(pairId) + ",");
+							}
+							else {
+								message.append (", who is next to someone,");
+							}
+						}
+					}
 
 					//pre emote (or single emote)
 					if (doPostEmote) { //make this the emote clause instead.
@@ -359,8 +437,8 @@ public class AOServer {
 					}
 					else if (doEmote) {
 						message.append (" acts out " + emote);
-						if (doShout && doEvidence)      { message.append (","); }
-						else if (doShout || doEvidence) { message.append (" and"); }
+						if (soundClause && doEvidence)      { message.append (","); }
+						else if (soundClause || doEvidence) { message.append (" and"); }
 					}
 
 					//shout
@@ -372,6 +450,9 @@ public class AOServer {
 
 						if (doEvidence) { message.append (" and"); }
 					}
+					else if (doSfx) {
+
+					}
 
 					//evidence
 					if (doEvidence) { //TODO: account for evidence.
@@ -381,60 +462,94 @@ public class AOServer {
 					}
 
 					//type of message
+					//TODO: add more qualifiers for text escapes.
+					//TODO: change text color if the entire message is formatted so to blue or gray 
+					//TODO: recognize OOC text
 					if (doMessage) { //if message has content.
-						if (doEvidence && doShout) { //It is the beginning of a sentence
-							message.append (" They");
-							if (realize)             { message.append (" realize"); }
-							else if (textColor == 4) { message.append (" say under their breath"); } //blue
-							else if (textColor == 5) { message.append (" brood"); } //yellow 
-							else if (textColor == 6) { message.append (" say in a gay manner"); } //rainbow
-							else                     { message.append (" say"); }
+						if (doEvidence && soundClause) { //It is the beginning of a sentence
+
+							if (realize)             { message.append (" They realize"); }
+							else if (textColor == 1) { message.append (" They say carfully"); } //green
+							else if (textColor == 2) { message.append (" They speak in a divine manner, saying"); } //red
+							else if (textColor == 4) { message.append (" They say under their breath"); } //blue
+							else if (textColor == 5) { message.append (" They brood"); } //yellow
+							else if (textColor == 6) { message.append (" They say in a gay manner"); } //rainbow
+							else if (textColor == 7) { message.append (" They say femininely"); } //pink
+							else if (textColor == 8) { message.append (" They say masculinely"); } //cyan
+							else if (textColor == 9) { message.append (" They whisper"); } //gray
+							else                     { message.append (" They say"); }
 						}
-						else if ((!doEvidence && !doShout)) {
+						else if ((!doEvidence && !soundClause) {
 							if (doEmote || doPostEmote) { message.append (" and"); }
 
 							if (realize)             { message.append (" realizes"); }
+							else if (textColor == 1) { message.append (" carfully says"); } //green
+							else if (textColor == 2) { message.append (" says in a divine manner"); } //red
 							else if (textColor == 4) { message.append (" says under their breath"); } //blue
-							else if (textColor == 5) { message.append (" broods"); } //yellow 
+							else if (textColor == 5) { message.append (" broods"); } //yellow
 							else if (textColor == 6) { message.append (" says in a gay manner"); } //rainbow
+							else if (textColor == 7) { message.append (" says femininely"); } //pink
+							else if (textColor == 8) { message.append (" says masculinely "); } //cyan
+							else if (textColor == 9) { message.append (" whispers"); } //gray
 							else                     { message.append (" says"); }
 						}
 						else {
 							message.append (" while");
 							if (realize)             { message.append (" realizing"); }
+							else if (textColor == 1) { message.append (" saying carefully"); }
+							else if (textColor == 2) { message.append (" their voice booms from above"); } //red
 							else if (textColor == 4) { message.append (" saying under their breath"); } //blue
-							else if (textColor == 5) { message.append (" brooding"); } //yellow 
+							else if (textColor == 5) { message.append (" brooding"); } //yellow
 							else if (textColor == 6) { message.append (" saying in a gay manner"); } //rainbow
+ 							else if (textColor == 9) { message.append (" whispering"); } //gray
+							else if (textColor == 7) { message.append (" femininely saying"); } //pink
+							else if (textColor == 8) { message.append (" masculinely saying"); } //cyan
 							else                     { message.append (" saying"); }
 						}
 
+						if (textSpeedMod >= 1) {
+							message.append (" hurriedly");
+						}
+						else if (textSpeedMod <= -1) {
+							message.append (" slowly");
+						}
+
+						if (isOOC) {
+							message.append (" out-of-characterly");
+						}
+
 						//message body
-						message.append (", \"" + msg + "\"");
+						if (textColor == 4) {
+							message.append (", \"_" + msg + "_\"");
+						}
+						else {
+							message.append (", \"" + msg + "\"");
+						}
 					}
 					else if (realize) {
 						if (doEvidence && doShout) {
 							message.append (" They realize something");
 						}
-						else if ((!doEvidence && !doShout)) {
+						else if ((!doEvidence && !soundClause)) {
 							message.append (" while realizing something");
 						}
 					}
 
 					//emote
 					if (doPostEmote) {
-						if (!doMessage && (!doEvidence && !doShout)) {
+						if (!doMessage && (!doEvidence && !soundClause)) {
 							message.append (" and acts out " + emote + " afterwards");
 						}
-						else if (doMessage && (!doEvidence && !doShout)) {
+						else if (doMessage && (!doEvidence && !soundClause)) {
 							message.append (", acting out " + emote + " afterwards");
 						}
-						else if (!doMessage && (doEvidence && doShout)) {
+						else if (!doMessage && (doEvidence && soundClause)) {
 							message.append (" They act out" + emote + " afterwards");
 						}
 						else if (doMessage && (doEvidence && doShout)) {
 							message.append (" and act out" + emote + " afterwards");
 						}
-						else if (doMessage && (doEvidence || doShout)) { //TODO: check logic on this 
+						else if (doMessage && (doEvidence || soundClause)) { //TODO: check logic on this 
 							message.append(" acting out " + emote + " afterwards");
 						}
 					}
@@ -452,13 +567,10 @@ public class AOServer {
 				}
 			}
 
-			else if (packet.contents[0].equals("CT")) { //CommunicaTe
-			}
-
 			else if (packet.contents[0].equals("MC")) { //Music Change
 				if (Discord.boundChannel != null && !packet.contents[2].equals("-1")) {
 					String name = (String) playerInfo.get (Integer.parseInt (packet.contents[2]));
-					String songName = packet.contents[1].replaceAll(".+(?=\\\\|\\/)", ""); //removes file extention
+					String songName = packet.contents[1].replaceAll("\\.(.*)", ""); //removes file extention
 					if (name == null) {
 						name = "Someone";
 					}
@@ -473,10 +585,11 @@ public class AOServer {
 			}
 
 			else if (packet.contents[0].equals("RT")) { //TODO: Render Testmonies?
-				//TODO: Ignored...
+				//TODO: lets start reporting this
 			}
 
 			else if (packet.contents[0].equals("HP")) { //Health Points
+				//TODO: should we start reporting this?
 				if (packet.contents[1].equals("1")) {
 					defHP = Integer.parseInt (packet.contents[2]);
 				}
@@ -486,16 +599,14 @@ public class AOServer {
 			}
 
 			else if (packet.contents[0].equals("BN")) { //Background Name
-				
+				Discord.sendMessage (String.format (getRandomString(RAND_AREACHANGE_MSGS), packet.content[1]));
 			}
 
-			//TODO: is there a client bug with malformed evidence?
-			//TODO: we could correct such automaticly, since it seems the stock client breaks on it.
+			//TODO: is there a client bug with malformed evidence? 
 			else if (packet.contents[0].equals("LE")) { //List Evidence
 				evidenceNames.clear ();
 				evidenceDesc.clear ();
 				evidenceImg.clear ();
-				boolean isDirty = false; //There's a bug where null evidence is
 				for (int i = 1; i < packet.contents.length; i++) {
 					String[] evi = packet.contents[i].split ("\\&");
 					try {
@@ -504,11 +615,7 @@ public class AOServer {
 						evidenceImg.add (evi[2]);
 					}
 					catch (IndexOutOfBoundsException e) {
-						isDirty = true;
-					}
-					if (isDirty) {
-						//sendPacket(new AOPacket("DE#"#%", encryption));
-					}
+					} //Do nothing, hope we get a new copy of the evidence
 				}
 			}
 
@@ -517,38 +624,19 @@ public class AOServer {
 				//TODO: we should actually care if the server is dead or not.
 			}
 
-			//Moderator related stuff
-			else if (packet.contents[0].equals("ZZ")) { //call mod
-				System.out.println ("A user is calling you, a mod...\n" + packet.contents[1]);
-				//TODO: we're never gonna be a mod, right?
-			}
-
-			else if (packet.contents[0].equals("IL")) { //Ip List
-				//Ignored...
-				//TODO: wait, why do we have to deal with this?
-			}
-
-			else if (packet.contents[0].equals("MU")) { //Mute User
-				//Ignored...
-				//No reason to want to mute someone.
-			}
-
-			else if (packet.contents[0].equals("UM")) { //UnMute user
-				//Ignored...
-				//No reason to want to mute someone.
-			}
-
 			else if (packet.contents[0].equals("KK")) { //Kick Klient
-				//Ignored...
-				//TODO: we should probably abort, huh?
+				Discord.sendMessage ("We have just been Kicked from the server!");
+				sock.close (); //exceptions should handle us from here, but should they?
 			}
 
-			else if (packet.contents[0].equals("KB")) { //TODO: oK, Ban?
-				System.out.println ("We have just been banned!");
+			else if (packet.contents[0].equals("KB")) { //Klient Ban
+				Discord.sendMessage ("We have just been banned!");
+				System.exit (-1);
 			}
 
 			else if (packet.contents[0].equals("BD")) { //BanneD
 				System.out.println ("We just tried to connect to a server that banned us!");
+				System.exit (-1);
 			}
 			//TODO: master server stuff
 		}
