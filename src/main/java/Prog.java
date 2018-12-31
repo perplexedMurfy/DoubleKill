@@ -2,6 +2,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 //ao master server 104.131.93.82:27016
 //Offical Unoffical server 104.131.93.82:27017
@@ -17,7 +18,7 @@ public class Prog {
 	static public List<Byte> fantaCrypt (byte[] bytes_in, int key) {
 		int k1 = 53761;
 		int k2 = 32618;
-		
+    
 		byte out = 0;
 		List<Byte> result = new ArrayList();
 		for (int i = 0; i < bytes_in.length; i++) {
@@ -30,6 +31,10 @@ public class Prog {
 		}
 		
 		return result;
+	}
+
+	static String getRandomString (String[] msg) {
+		return msg[ThreadLocalRandom.current().nextInt(0, msg.length)];
 	}
 	
 	static Map<String, String> getConfig() throws IOException {
@@ -72,13 +77,12 @@ public class Prog {
 				}
 			}
 			catch (Exception e) {
-				System.out.println (lastExcept);
+				System.out.println (e);
 				recovery = true;
 				lastExcept = e;
-				server.close ();
-				Discord.shutdown ();
-				System.out.println ();
 			}
+			server.close ();
+			Discord.shutdown ();
 		}
 	}
 }
